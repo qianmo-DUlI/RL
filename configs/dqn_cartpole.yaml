@@ -1,0 +1,23 @@
+# 网络
+hidden_dim: 128
+
+# buffer
+buffer_size: 10000
+
+# optimizer
+lr: 0.0003
+
+# dqn
+gamma: 0.99
+batch_size: 128
+
+# epsilon-greedy
+epsilon_start: 0.9
+epsilon_end: 0.01
+epsilon_decay: 2500
+
+# target network
+target_update_freq: 200
+
+# train
+num_episodes: 600

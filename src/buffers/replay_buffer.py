@@ -11,8 +11,8 @@ class ReplayBuffer:
         self.capacity = capacity
 
     # 将新的数据（这个数据是与环境交互时产生的）入栈
-    def push(self, state, action, next_state, reward):
-        self.memory.append(Transition(state, action, next_state, reward))
+    def push(self, state, action, reward, next_state, done):
+        self.memory.append(Transition(state, action, reward, next_state, done))
 
     def sample(self, batch_size):
         return random.sample(self.memory, batch_size)
