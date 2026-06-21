@@ -1,62 +1,76 @@
+from itertools import count
 from pathlib import Path
 
 import gymnasium as gym
-import numpy as np
 import torch
 
 from src.agents.dqn_agent import DQNAgent
 from src.common.config import Config
+from src.common.device import get_device
 
 
-def train(config: Config):
+def train(config):
     env = gym.make("CartPole-v1")
+
     state_dim = env.observation_space.shape[0]
     action_dim = env.action_space.n
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    agent = DQNAgent(state_dim, action_dim, config, device)
+    device = get_device()
+
+    agent = DQNAgent(
+        state_dim,
+        action_dim,
+        config,
+        device,
+    )
+
+    episode_rewards = []
 
     for episode in range(config.num_episodes):
         state, _ = env.reset()
+        state = torch.tensor(
+            state,
+            dtype=torch.float32,
+            device=device,
+        ).unsqueeze(0)
         episode_reward = 0
-        done = False
-
-        while not done:
-            # epsilon-greedy
-            epsilon = max(
-                config.epsilon_end,
-                config.epsilon_start - (agent.total_steps / config.epsilon_decay),
-            )
-
-            if np.random.random() < epsilon:
-                action = env.action_space.sample()
-            else:
-                state_tensor = torch.FloatTensor(state).unsqueeze(0).to(device)
-                with torch.no_grad():
-                    q_values = agent.policy_net(state_tensor)
-                action = q_values.argmax(dim=1).item()
-
-            next_state, reward, terminated, truncated, _ = env.step(action)
+        for _ in count():
+            action = agent.select_action(state)
+            obs, reward, terminated, truncated, _ = env.step(action.item())
             done = terminated or truncated
-
-            agent.memory.push(state, action, next_state, reward)
-            agent.total_steps += 1
-
+            next_state = torch.tensor(
+                obs, dtype=torch.float32, device=device
+            ).unsqueeze(0)
+            reward_tensor = torch.tensor([reward], dtype=torch.float32, device=device)
+            agent.store_transition(state, action, reward_tensor, next_state, done)
+            metrics = agent.update()
+            if metrics and agent.total_steps % agent.target_update_freq == 0:
+                agent.update_target_network()
             state = next_state
             episode_reward += reward
+            if done:
+                break
 
-            if len(agent.memory) >= config.batch_size:
-                agent.update()
+        episode_rewards.append(episode_reward)
 
-        print(
-            f"Episode {episode:4d} | Reward: {episode_reward:6.1f} | Epsilon: {epsilon:.3f}"
-        )
+        if (episode + 1) % 10 == 0:
+            avg_reward = sum(episode_rewards[-10:]) / 10
+
+            print(
+                f"Episode [{episode + 1}/{config.num_episodes}] "
+                f"Avg Reward: {avg_reward:.2f}"
+            )
 
     env.close()
+
+    return agent
 
 
 if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
     config = Config.from_yaml(project_root / "configs" / "dqn_cartpole.yaml")
     print(config)
-    # train(config)
+    agent = train(config)
+    save_path = project_root / "models" / "dqn_cartpole.pth"
+    agent.save(save_path)
+    print(f"Model saved to: {save_path}")
