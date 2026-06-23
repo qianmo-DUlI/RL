@@ -110,6 +110,9 @@ class DQNAgent(BaseAgent):
         torch.nn.utils.clip_grad_value_(self.policy_net.parameters(), 100)
         self.optimizer.step()
 
+        if self.total_steps % self.target_update_freq == 0:
+            self.update_target_network()
+
         return {
             "loss": loss.item(),
             "epsilon": self.epsilon,

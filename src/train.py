@@ -4,6 +4,7 @@ from pathlib import Path
 import gymnasium as gym
 import torch
 
+from common.logger import Logger
 from src.agents.dqn_agent import DQNAgent
 from src.common.config import Config
 from src.common.device import get_device
@@ -24,7 +25,7 @@ def train(config):
         device,
     )
 
-    episode_rewards = []
+    logger = Logger()
 
     for episode in range(config.num_episodes):
         state, _ = env.reset()
@@ -34,6 +35,7 @@ def train(config):
             device=device,
         ).unsqueeze(0)
         episode_reward = 0
+
         for _ in count():
             action = agent.select_action(state)
             obs, reward, terminated, truncated, _ = env.step(action.item())
@@ -43,22 +45,23 @@ def train(config):
             ).unsqueeze(0)
             reward_tensor = torch.tensor([reward], dtype=torch.float32, device=device)
             agent.store_transition(state, action, reward_tensor, next_state, done)
+
             metrics = agent.update()
-            if metrics and agent.total_steps % agent.target_update_freq == 0:
-                agent.update_target_network()
+            if metrics:
+                logger.log(metrics)
+
             state = next_state
             episode_reward += reward
             if done:
                 break
 
-        episode_rewards.append(episode_reward)
-
+        logger.log({"episode_reward": episode_reward})
         if (episode + 1) % 10 == 0:
-            avg_reward = sum(episode_rewards[-10:]) / 10
-
             print(
-                f"Episode [{episode + 1}/{config.num_episodes}] "
-                f"Avg Reward: {avg_reward:.2f}"
+                f"Episode {episode} | "
+                f"Reward={logger.mean('episode_reward', 10):.1f} | "
+                f"Loss={logger.mean('loss', 100):.4f} | "
+                f"Epsilon={logger.metrics['epsilon'][-1]:.3f}"
             )
 
     env.close()
