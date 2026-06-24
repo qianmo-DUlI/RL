@@ -4,13 +4,13 @@ from pathlib import Path
 import gymnasium as gym
 import torch
 
-from common.logger import Logger
 from src.agents.dqn_agent import DQNAgent
 from src.common.config import Config
 from src.common.device import get_device
+from utils.logger import Logger
 
 
-def train(config):
+def train(config, project_root):
     env = gym.make("CartPole-v1")
 
     state_dim = env.observation_space.shape[0]
@@ -25,7 +25,7 @@ def train(config):
         device,
     )
 
-    logger = Logger()
+    logger = Logger(log_dir=project_root / "results" / "logs" / "dqn_cartpole")
 
     for episode in range(config.num_episodes):
         state, _ = env.reset()
@@ -48,22 +48,22 @@ def train(config):
 
             metrics = agent.update()
             if metrics:
-                logger.log(metrics)
+                logger.log(metrics, step=agent.total_steps)
 
             state = next_state
             episode_reward += reward
             if done:
                 break
 
-        logger.log({"episode_reward": episode_reward})
+        logger.log({"episode_reward": episode_reward}, step=episode)
         if (episode + 1) % 10 == 0:
             print(
                 f"Episode {episode} | "
                 f"Reward={logger.mean('episode_reward', 10):.1f} | "
                 f"Loss={logger.mean('loss', 100):.4f} | "
-                f"Epsilon={logger.metrics['epsilon'][-1]:.3f}"
+                f"Epsilon={logger.latest("epsilon"):.3f}"
             )
-
+    logger.close()
     env.close()
 
     return agent
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     project_root = Path(__file__).resolve().parent.parent
     config = Config.from_yaml(project_root / "configs" / "dqn_cartpole.yaml")
     print(config)
-    agent = train(config)
+    agent = train(config, project_root)
     save_path = project_root / "models" / "dqn_cartpole" / "dqn_cartpole.pth"
     agent.save(save_path)
     print(f"Model saved to: {save_path}")
