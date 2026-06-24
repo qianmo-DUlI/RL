@@ -73,7 +73,7 @@ if __name__ == "__main__":
         device,
     )
 
-    agent.load(project_root / "models" / "dqn_cartpole.pth")
+    agent.load(project_root / "models" / "dqn_cartpole"/"best_model.pth")
 
     evaluate(
         agent,
