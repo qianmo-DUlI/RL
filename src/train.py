@@ -74,6 +74,6 @@ if __name__ == "__main__":
     config = Config.from_yaml(project_root / "configs" / "dqn_cartpole.yaml")
     print(config)
     agent = train(config)
-    save_path = project_root / "models" / "dqn_cartpole.pth"
+    save_path = project_root / "models" / "dqn_cartpole" / "dqn_cartpole.pth"
     agent.save(save_path)
     print(f"Model saved to: {save_path}")
